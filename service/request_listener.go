@@ -22,23 +22,27 @@ func (r RequestManagerListenerFactory) NewRequestManagerListener(logger api.Logg
 
 func (r *RequestManagerListener) Start() error {
 	var err error
-	tcpListener, err := net.Listen("tcp", ":0")
-	if err != nil {
-		r.logger.Error("Unable to create tcp listener : " + err.Error())
-		return err
-	}
-	r.tcpListener = tcpListener.(*net.TCPListener)
 
-	r.handleTcpPacket()
+	go func() {
+		tcpListener, err := net.Listen("tcp", ":0")
+		if err != nil {
+			r.logger.Error("Unable to create tcp listener : " + err.Error())
+			return
+		}
+		r.tcpListener = tcpListener.(*net.TCPListener)
+		r.handleTcpPacket()
+	}()
 	r.logger.Info("TCP listener are ready!")
 
-	r.udpListener, err = net.ListenPacket("udp", "0.0.0.0:0")
-	if err != nil {
-		r.logger.Error("Unable to create udp listener : " + err.Error())
-		return err
-	}
+	go func() {
+		r.udpListener, err = net.ListenPacket("udp", "0.0.0.0:0")
+		if err != nil {
+			r.logger.Error("Unable to create udp listener : " + err.Error())
+			return
+		}
 
-	r.handleUdpPacket()
+		r.handleUdpPacket()
+	}()
 	r.logger.Info("UDP listener are ready!")
 	return nil
 }

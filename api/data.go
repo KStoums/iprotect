@@ -5,6 +5,7 @@ type DataServiceFactory interface {
 }
 
 type DataService interface {
+	InitData() error
 	GetAddressState(address string) bool
 	AddBlockedAddress(address string)
 	RemoveBlockAddress(address string)

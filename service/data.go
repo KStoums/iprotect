@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+const dataFilePath = "./data/blocked_ip.json"
+
 type DataServiceFactory struct {
 	api.DataService
 }
@@ -18,27 +20,37 @@ type DataService struct {
 	data   []model.BlockedIp
 }
 
-func (d DataServiceFactory) NewDataService(logger api.LoggerService) api.DataService {
-	bytes, err := os.ReadFile("./data/blocked_ip.json")
+func (d DataServiceFactory) NewDataService(logger api.LoggerService) (api.DataService, error) {
+	_, err := os.Stat("./data/blocked_ip.json")
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			err = os.MkdirAll("./data/blocked_ip.json", 777)
+			err = createDataFile(logger)
 			if err != nil {
-				logger.Error("Unable create file blocked_ip.json : " + err.Error())
-				return nil
+				logger.Error("Unable to create file blocked_ip.json : " + err.Error())
+				return nil, err
 			}
 		}
-		logger.Error("Unable to read file blocked_ip.json : " + err.Error())
-		return nil
+
+		logger.Error("Unable to get stats from file blocked_ip.json : " + err.Error())
+		return nil, err
 	}
 
-	err = json.Unmarshal(bytes, d.DataService)
+	return &DataService{logger: logger}, nil
+}
+
+func (d *DataService) InitData() error {
+	bytes, err := os.ReadFile(dataFilePath)
 	if err != nil {
-		logger.Error("Unable to unmarshal json data : " + err.Error())
-		return nil
+		d.logger.Error("Unable to read file blocked_ip.json : " + err.Error())
+		return err
+	}
+	err = json.Unmarshal(bytes, &d.data)
+	if err != nil {
+		d.logger.Error("Unable to unmarshal json data from file blocked_ip.json : " + err.Error())
+		return err
 	}
 
-	return &DataService{logger: logger}
+	return nil
 }
 
 func (d *DataService) GetAddressState(address string) bool {
@@ -77,4 +89,31 @@ func (d *DataService) RemoveBlockAddress(address string) {
 	}
 
 	d.logger.Info("Address " + address + " are not blocked!")
+}
+
+func createDataFile(logger api.LoggerService) error {
+	err := os.MkdirAll("./data/", 0777)
+	if err != nil {
+		logger.Error("Unable create parents directory for blocked_ip.json : " + err.Error())
+		return err
+	}
+
+	file, err := os.Create("./data/blocked_ip.json")
+	if err != nil {
+		logger.Error("Unable to create file blocked_ip.json : " + err.Error())
+		return err
+	}
+
+	defaultBytes := []byte("[]")
+	err = os.WriteFile(file.Name(), defaultBytes, 0777)
+	if err != nil {
+		logger.Error("Unable to initialize blocked_ip.json : " + err.Error())
+		return err
+	}
+	err = file.Close()
+	if err != nil {
+		logger.Error("Unable to close file blocked_ip.json : " + err.Error())
+		return err
+	}
+	return nil
 }
